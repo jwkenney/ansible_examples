@@ -1,12 +1,14 @@
 ---
+
 # Various ways to munge a list-of-dictionaries with a nested list.
-# Search items:
+# Key search terms:
 #  - json_query
 #  - items2dict
 #  - type_debug
 
 - hosts: localhost
   connection: local
+  gather_facts: no
 
   vars:
     networks:
@@ -27,17 +29,18 @@
   
   - name: Identify what types of data you are working with
     debug:
-      msg: >
-        The 'networks' variable is a {{ networks | type_debug }}.
-        First item in 'networks' var is a {{ networks[0] | type_debug }}.
-        The nested 'addresses' var is a {{ networks[0]['addresses'] | type_debug }}.
+      msg:
+        - The 'networks' variable is a {{ networks | type_debug }}.
+        - The first item in the 'networks' var is a {{ networks[0] | type_debug }}.
+        - The nested 'addresses' var is a {{ networks[0]['addresses'] | type_debug }}.
+        - The first address entry in the first group entry is a {{ networks[0]['addresses'][0] | type_debug }}.
   
   # [*] means return all list items, [] means flatten the (nested) list
   - name: Print a flattened list of address entries using json_query
     debug:
       var: networks | json_query('[*].addresses[]')
   
-  - name: Loop through flattened list of all address entries
+  - name: Print address entries using loop with json_query
     debug:
       msg: "member: {{ item.member }}, subnet: {{ item.subnet }}"
     loop: "{{ networks | json_query('[*].addresses[]') }}"
