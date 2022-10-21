@@ -1,0 +1,55 @@
+---
+# Various ways to munge a list-of-dictionaries with a nested list.
+# Search items:
+#  - json_query
+#  - items2dict
+#  - type_debug
+
+- hosts: localhost
+  connection: local
+
+  vars:
+    networks:
+      - group: group1
+        addresses:
+          - member: test1
+            subnet: 1.1.1.1/32
+          - member: test2
+            subnet: 2.2.2.2/32
+      - group: group2
+        addresses:
+          - member: test3
+            subnet: 3.3.3.3/32
+          - member: test4
+            subnet: 4.4.4.4/32
+  
+  tasks:
+  
+  - name: Identify what types of data you are working with
+    debug:
+      msg: >
+        The 'networks' variable is a {{ networks | type_debug }}.
+        First item in 'networks' var is a {{ networks[0] | type_debug }}.
+        The nested 'addresses' var is a {{ networks[0]['addresses'] | type_debug }}.
+  
+  # [*] means return all list items, [] means flatten the (nested) list
+  - name: Print a flattened list of address entries using json_query
+    debug:
+      var: networks | json_query('[*].addresses[]')
+  
+  - name: Loop through flattened list of all address entries
+    debug:
+      msg: "member: {{ item.member }}, subnet: {{ item.subnet }}"
+    loop: "{{ networks | json_query('[*].addresses[]') }}"
+  
+  - name: Turn networks var into a dictionary, for easier lookups by-group
+    set_fact:
+      network_addresses_bygroup: "{{ networks | items2dict(key_name='group',value_name='addresses') }}"
+  
+  - name: Print network address dictionary
+    debug:
+      var: network_addresses_bygroup
+  
+  - name: Print the addresses for just group1
+    debug:
+      var: network_addresses_bygroup['group1']
