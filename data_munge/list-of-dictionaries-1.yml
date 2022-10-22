@@ -1,16 +1,14 @@
 ---
 
 # Various ways to munge a list-of-dictionaries with a nested list.
-# Key search terms:
-#  - json_query
-#  - items2dict
-#  - type_debug
+# Ref: https://www.reddit.com/r/ansible/comments/y9v5rf/help_with_error_dictionary_requested_could_not/
 
 - hosts: localhost
   connection: local
   gather_facts: no
 
   vars:
+    
     networks:
       - group: group1
         addresses:
@@ -26,7 +24,7 @@
             subnet: 4.4.4.4/32
   
   tasks:
-  
+
   - name: Identify what types of data you are working with
     debug:
       msg:
@@ -34,7 +32,7 @@
         - The first item in the 'networks' var is a {{ networks[0] | type_debug }}.
         - The nested 'addresses' var is a {{ networks[0]['addresses'] | type_debug }}.
         - The first address entry in the first group entry is a {{ networks[0]['addresses'][0] | type_debug }}.
-  
+
   # [*] means return all list items, [] means flatten the (nested) list
   - name: Print a flattened list of address entries using json_query
     debug:
@@ -56,3 +54,20 @@
   - name: Print the addresses for just group1
     debug:
       var: network_addresses_bygroup['group1']
+
+  # firewall_addrgrp.member expects a list of hashes in format [{"name": "foo"}, {"name:" "bar"}]
+  # We use json_query to build the list-of-hashes in desired format.
+  - name: Simulate fortios_firewall_addrgrp task
+    debug:
+      msg: |
+        fortios_firewall_addrgrp:
+          vdom: foo
+          access_token: bar
+          state: present
+          firewall_addrgrp:
+            name: {{ item.group }}
+            member: {{ item.addresses | json_query(query) }}
+            allow_routing: enable
+    loop: "{{ networks }}"
+    vars:
+      query: '[*].{name: member}'
