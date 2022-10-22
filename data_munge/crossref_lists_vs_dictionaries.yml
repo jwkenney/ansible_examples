@@ -1,0 +1,110 @@
+---
+
+# This playbook illustrates how tasks may change, when accessing the same data
+# in two different formats (list-of-dicts vs dictionary).
+# In general, lists are ideal for looping, and dictionaries are ideal for lookups.
+
+- name: LIST-OF-DICTS - Looping and cross-referencing between two lists-of-dicts
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    
+    websites_list:
+      - name: domain.tld
+        php_user: domain_php
+        subject_alt_names:
+          - domain.tld
+          - www.domain.tld
+      - name: domain2.tld
+        php_user: domain_php2
+        subject_alt_names:
+          - domain.tld2
+          - www.domain.tld2
+    
+    databases_list:
+      - name: domain.tld
+        db_name: domain_db
+        db_user: domain_dba
+        db_user_pass: blargblarg
+      - name: domain2.tld
+        db_name: domain_db2
+        db_user: domain_dba2
+        db_user_pass: oogabooga
+
+  tasks:
+
+  # We expect selectattr to return a 'list of one', and we eat the list with |first
+  - name: LIST-OF-DICTS | Fetch database info for domain.tld
+    debug:
+      var: databases_list | selectattr('name', '==', my_host) | list | first
+    vars:
+      my_host: domain.tld
+
+  # Using temporary var 'db_attributes' to break up the work.
+  # Again, selectattr gives us a list to filter or devour
+  - name: LIST-OF-DICTS | Fetch database info for each item under websites_list
+    debug:
+      msg: >
+        Site name {{ item.name }}.
+        Site php user {{ item.php_user }}.
+        DB name {{ db_attributes.db_name | default('NOTFOUND') }}.
+        DB user {{ db_attributes.db_user | default('NOTFOUND') }}.
+        DB pass {{ db_attributes.db_user_pass | default('NOTFOUND') }}.
+    vars:
+      db_attributes: "{{ databases_list | selectattr('name', 'equalto', item.name ) | list | first }}"
+    loop: "{{ websites_list }}"
+    loop_control:
+      label: "{{ item.name }}"
+  
+
+
+# Same data as above, but now we format it as two dictionaries.
+# Often this results in cleaner/easier lookups, and looping can be done
+# using the dict2items filter where appropriate.
+- name: DICTIONARIES - Looping and cross-referencing between two dictionaries
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+
+    websites_dict:
+      domain.tld:
+        php_user: domain_php
+        subject_alt_names:
+          - domain.tld
+          - www.domain.tld
+      domain2.tld:
+        php_user: domain_php2
+        subject_alt_names:
+        - domain.tld2
+        - www.domain.tld2
+
+    databases_dict:
+      domain.tld:
+        db_name: domain_db
+        db_user: domain_dba
+        db_user_pass: blargblarg
+      domain2.tld:
+        db_name: domain_db2
+        db_user: domain_dba2
+        db_user_pass: oogabooga
+  
+  tasks:
+  
+  - name: DICTIONARIES | Fetch database info for domain.tld (easy!)
+    debug:
+      var: databases_dict['domain.tld']
+  
+  - name: DICTIONARIES | Fetch database info for each item under websites_list
+    debug:
+      msg: >
+        Site name {{ item.key }}.
+        Site php user {{ item.value.php_user }}.
+        DB name {{ databases_dict[item.key]['db_name'] | default('NOTFOUND') }}.
+        DB user {{ databases_dict[item.key]['db_user'] | default('NOTFOUND') }}.
+        DB pass {{ databases_dict[item.key]['db_user_pass'] | default('NOTFOUND') }}.
+    loop: "{{ websites_dict | dict2items }}"
+    loop_control:
+      label: "{{ item.key }}"
